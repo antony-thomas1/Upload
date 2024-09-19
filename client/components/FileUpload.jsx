@@ -48,8 +48,8 @@ const FileUpload = () => {
     setIsLoading(true);
     try {
       // Upload file to IPFS using thirdweb's storage API
-      const uri = await thirdwebUpload({
-        client: undefined, // Provide a valid client if necessary
+      const uri = await upload({
+        client, // Provide a valid client if necessary
         files: [file],
       });
       
