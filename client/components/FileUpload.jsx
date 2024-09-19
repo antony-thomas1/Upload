@@ -94,7 +94,7 @@ const FileUpload = () => {
               
               {!isLoading && contractFiles.length === 0 && (
                 <p className="font-poppins font-semibold text-[14px] leading-[30px] text-[#818183]">
-                  You have not created any campigns yet
+                  You have not uploaded any file yet
                 </p>
               )}
 
