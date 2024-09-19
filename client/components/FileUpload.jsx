@@ -1,12 +1,11 @@
-import React from 'react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileCard, Loader } from '../components';
 import { useAddress, useContract, useContractWrite } from "@thirdweb-dev/react";
-import { upload as thirdwebUpload } from 'thirdweb/storage';
-import { createThirdwebClient } from "thirdweb";
+import { createThirdwebClient, upload, download } from "thirdweb/storage";
 
+// Initialize the client for IPFS storage
 const client = createThirdwebClient({
-  clientKey: "1a84efe6281671c4ff85abd9c276386f",
+  clientKey: "1a84efe6281671c4ff85abd9c276386f", // Thirdweb client key
 });
 
 const FileUpload = () => {
@@ -22,88 +21,86 @@ const FileUpload = () => {
     link: '',
   });
 
+  // Handle input field changes
   const handleFormFieldChange = (fieldName, e) => {
     setForm({ ...form, [fieldName]: e.target.value });
   };
 
+  // Function to upload file metadata to the smart contract
   const uploadFile = async (form) => {
     try {
       const data = await addFile([
         address, // owner
         form.name, // name
-        form.link, // link
+        form.link, // link to the file on IPFS
       ]);
-      console.log("contract call success", data);
+
+      console.log("Contract call success", data);
     } catch (error) {
-      console.log("contract call failure", error);
+      console.log("Contract call failure", error);
     }
   };
 
+  // Function to upload a file to IPFS and get the URL
   const uploadToIpfs = async () => {
-    if (!file) {
-      console.error("No file selected.");
-      return;
-    }
-    
     setIsLoading(true);
     try {
-      // Upload file to IPFS using thirdweb's storage API
-      const uri = await upload({
-        client, // Provide a valid client if necessary
+      const uploadUrl = await upload({
+        client,
         files: [file],
       });
-      
-      console.info('IPFS URI:', uri);
 
-      // Resolve the gateway URL (if needed)
-      const url = `https://ipfs.thirdwebstorage.com/ipfs/${uri.split('://')[1]}/0`;
-      console.info('Gateway URL:', url);
-
-      // Update form with the IPFS URL and upload to contract
-      form.link = url;
-      await uploadFile({ ...form });
+      form.link = uploadUrl[0]; // Use the first URL returned
+      await uploadFile({ ...form }); // Upload the form to the contract
     } catch (error) {
-      console.error("IPFS upload failed", error);
-    } finally {
-      setIsLoading(false);
-      location.reload(); // Reload the page after upload
+      console.error("Error uploading file to IPFS", error);
+    }
+    setIsLoading(false);
+    location.reload(); // Reload page after uploading
+  };
+
+  // Function to get files from the contract
+  const getFile = async () => {
+    try {
+      const files = await contract.call('getFile');
+      const parsedFiles = files.map((File, i) => ({
+        owner: File.owner,
+        name: File.name,
+        link: File.link,
+        pId: i,
+      }));
+
+      return parsedFiles;
+    } catch (error) {
+      console.error("Error fetching files from contract", error);
+      return [];
     }
   };
 
-  const getFile = async () => {
-    const files = await contract.call('getFile');
-    const parsedFiles = files.map((File, i) => ({
-      owner: File.owner,
-      name: File.name,
-      link: File.link,
-      pId: i,
-    }));
-
-    return parsedFiles;
-  };
-
+  // Fetch files uploaded by the current user
   const getUserFile = async () => {
-    const allfiles = await getFile();
-    const filteredFiles = allfiles.filter((File) => File.owner === address);
+    const allFiles = await getFile();
+    const filteredFiles = allFiles.filter((File) => File.owner === address);
     return filteredFiles;
   };
 
-  const FetchFiles = async () => {
-    const data = await getUserFile();
+  // Fetch user files on component mount
+  const fetchFiles = async () => {
     setIsLoading(true);
+    const data = await getUserFile();
     setContractFiles(data);
     setIsLoading(false);
   };
 
   useEffect(() => {
-    if (contract) FetchFiles();
+    if (contract) fetchFiles();
   }, [address, contract]);
 
   return (
-    <div className='my-[30px] flex justify-center items-center '>
-      <div className='w-full min-h-screen p-[20px]'>
-        <div className='flex justify-center items-center gap-[30px]'>
-          <div className='w-screen mx-[20px] h-[500px] ml-[50px]'>
+    <div className="my-[30px] flex justify-center items-center">
+      <div className="w-full min-h-screen p-[20px]">
+        <div className="flex justify-center items-center gap-[30px]">
+          <div className="w-screen mx-[20px] h-[500px] ml-[50px]">
             <h1 className="font-poppins font-semibold text-[20px] text-white text-left">
               All Files ({contractFiles.length})
             </h1>
@@ -115,30 +112,30 @@ const FileUpload = () => {
                 </p>
               )}
               {!isLoading && contractFiles.length > 0 && contractFiles.map((File) => (
-                <FileCard
-                  key={File.pId}
-                  {...File}
-                  handleClick={() => window.open(File.link, '_blank')}
+                <FileCard 
+                  key={File.pId} 
+                  {...File} 
+                  handleClick={() => window.open(File.link, '_blank')} 
                 />
               ))}
             </div>
           </div>
-          <div className='flex-1 justify-center items-center gap-10 w-[300px] h-[500px] p-[5px] mr-[40px] mt-[60px]'>
+          <div className="flex-1 justify-center items-center gap-10 w-[300px] h-[500px] p-[5px] mr-[40px] mt-[60px]">
             <input
-              className='py-[15px] px-[15px] mt-[10px] w-full outline-none border-[1px] border-[#79797e] bg-transparent font-epilogue text-white text-[16px] placeholder:text-[#79797e] rounded-[10px]'
+              className="py-[15px] px-[15px] mt-[10px] w-full outline-none border-[1px] border-[#79797e] bg-transparent font-epilogue text-white text-[16px] placeholder:text-[#79797e] rounded-[10px]"
               type="text"
-              placeholder='File name'
+              placeholder="File name"
               value={form.name}
               onChange={(e) => handleFormFieldChange('name', e)}
             />
             <input
-              className='py-[15px] px-[15px] mt-[10px] outline-none border-[1px] border-[#79797e] bg-transparent font-epilogue text-white text-[14px] placeholder:text-[#79797e] rounded-[10px]'
+              className="py-[15px] px-[15px] mt-[10px] outline-none border-[1px] border-[#79797e] bg-transparent font-epilogue text-white text-[14px] placeholder:text-[#79797e] rounded-[10px]"
               type="file"
               onChange={(e) => setFile(e.target.files[0])}
             />
-            <div className='justify-center items-center my-[10px] px-[80px]'>
+            <div className="justify-center items-center my-[10px] px-[80px]">
               <button
-                className='px-[20px] py-[10px] bg-[#2682ec] rounded-[12px] text-white font-bold font-poppins text-[18px]'
+                className="px-[20px] py-[10px] bg-[#2682ec] rounded-[12px] text-white font-bold font-poppins text-[18px]"
                 onClick={uploadToIpfs}
               >
                 Upload
